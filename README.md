@@ -62,7 +62,6 @@ Android 版本升级库。
 | notifyId              | 通知栏消息id                           | 1011         |
 | notificationChannel   | 适配Android O的渠道通知                | 详情查阅源码 |
 | httpManager           | 设置自己的下载过程                     | null         |
-| enableLog             | 是否需要日志输出                       | true         |
 | onDownloadListener    | 下载过程的回调                         | null         |
 | jumpInstallPage       | 下载完成是否自动弹出安装页面           | true         |
 | showNotification      | 是否显示通知栏进度（后台下载提示）     | true         |
@@ -96,7 +95,15 @@ Android 版本升级库。
             } 
         
             
-3.   开始使用！
+3.   创建`DownloadManager`
+
+    ```java
+        DownloadManager manager = DownloadManager.getInstance(this);
+        manager.setApkName("appupdate.apk")
+                .setApkUrl("https://raw.githubusercontent.com/azhon/AppUpdate/master/apk/appupdate.apk")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .download();
+    ```
 
 ## 更新日志
 
