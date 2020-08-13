@@ -9,7 +9,10 @@ Android 版本升级库。
 ## 摘要
 
   - [功能介绍](#功能介绍)
-  - [怎么使用](#怎么使用)
+  - [DownloadManager](#downloadmanager配置文档)
+  - [UpdateConfiguration](#updateconfiguration配置文档)
+  - [使用步骤](#使用步骤)
+  - [使用技巧](#使用技巧)
   - [更新日志](#更新日志)
   - [关于作者](#关于作者)
   - [致谢](#致谢)
@@ -32,6 +35,44 @@ Android 版本升级库。
 * [x] 支持取消下载(如果发送了通知栏消息，则会移除)
 * [x] 支持下载完成 打开新版本后删除旧安装包文件
 * [x] 使用HttpURLConnection下载，未集成其他第三方框架
+
+## DownloadManager：配置文档
+
+> 初始化使用`DownloadManager.getInstance(this)`
+| 属性             | 描述                                                                                    | 默认值                | 是否必须设置 |
+|:-------------- |:----------------------------------------------------------------------------------------- |:--------------------- |:------------ |
+| context        | 上下文                                                                                    | null                  | true         |
+| apkUrl         | apk的下载地址                                                                             | null                  | true         |
+| apkName        | apk下载好的名字                                                                           | null                  | true         |
+| downloadPath   | apk下载的位置 (2.7.0以上版本已过时)                                                       | getExternalCacheDir() | false        |
+| showNewerToast | 是否提示用户 "当前已是最新版本"                                                           | false                 | false        |
+| smallIcon      | 通知栏的图标(资源id)                                                                      | -1                    | true         |
+| configuration  | 这个库的额外配置                                                                          | null                  | false        |
+| apkVersionCode | 更新apk的versionCode <br>(如果设置了那么库中将会进行版本判断<br>下面的属性也就需要设置了)           | Integer.MIN_VALUE     | false        |
+| apkVersionName | 更新apk的versionName                                                                      | null                  | false        |
+| apkDescription | 更新描述                                                                                  | null                  | false        |
+| apkSize        | 新版本的安装包大小（单位M）                                                               | null                  | false        |
+| apkMD5         | 新安装包的md5（32位)                                                                      | null                  | false        |
+
+## UpdateConfiguration：配置文档
+
+| 属性                  | 描述                                   | 默认值       |
+|:--------------------- |:-------------------------------------- |:------       |
+| notifyId              | 通知栏消息id                           | 1011         |
+| notificationChannel   | 适配Android O的渠道通知                | 详情查阅源码 |
+| httpManager           | 设置自己的下载过程                     | null         |
+| enableLog             | 是否需要日志输出                       | true         |
+| onDownloadListener    | 下载过程的回调                         | null         |
+| jumpInstallPage       | 下载完成是否自动弹出安装页面           | true         |
+| showNotification      | 是否显示通知栏进度（后台下载提示）     | true         |
+| forcedUpgrade         | 是否强制升级                           | false        |
+| showBgdToast          | 是否提示 "正在后台下载新版本…"        | true         |
+| onButtonClickListener | 按钮点击事件回调                       | null         |
+| dialogImage           | 对话框背景图片资源(图片规范参考demo)   | -1           |
+| dialogButtonColor     | 对话框按钮的颜色                       | -1           |
+| dialogButtonTextColor | 对话框按钮的文字颜色                   | -1           |
+| dialogProgressBarColor| 对话框进度条和文字颜色                 | -1           |
+
 
 ## 怎么使用
 
