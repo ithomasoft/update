@@ -97,13 +97,13 @@ Android 版本升级库。
             
 3.   创建`DownloadManager`
 
-    
+```
         DownloadManager manager = DownloadManager.getInstance(this);
         manager.setApkName("appupdate.apk")
                 .setApkUrl("https://raw.githubusercontent.com/azhon/AppUpdate/master/apk/appupdate.apk")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .download();
-    
+```
 
 ## 更新日志
 
