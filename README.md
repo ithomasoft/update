@@ -76,28 +76,30 @@ Android 版本升级库。
 
 ## 怎么使用
 
-1. 在项目根目录的`build.gradle`文件中添加如下代码：
+#### 在项目根目录的`build.gradle`文件中添加如下代码：
         
-         
+```groovy  
     	    allprojects {
     		    repositories {
     			    ...
     			    maven { url 'https://jitpack.io' }
     		    }
     	    }  
-    	
-    	
-2.  添加项目依赖：
+```	
+    
+
+	
+####  添加项目依赖：
         
-        
+```groovy       
             dependencies {
                 implementation 'com.github.ithomasoft:update:1.0.0'
             } 
-        
+```        
             
-3.   创建`DownloadManager`
+####   创建`DownloadManager`
 
-```
+```java
         DownloadManager manager = DownloadManager.getInstance(this);
         manager.setApkName("appupdate.apk")
                 .setApkUrl("https://raw.githubusercontent.com/azhon/AppUpdate/master/apk/appupdate.apk")
