@@ -76,7 +76,7 @@ Android 版本升级库。
 
 ## 怎么使用
 
-#### 在项目根目录的`build.gradle`文件中添加如下代码：
+#### 1.在项目根目录的`build.gradle`文件中添加如下代码：
         
 ```groovy  
     	    allprojects {
@@ -86,10 +86,8 @@ Android 版本升级库。
     		    }
     	    }  
 ```	
-    
-
 	
-####  添加项目依赖：
+####  2.添加项目依赖：
         
 ```groovy       
             dependencies {
@@ -97,7 +95,7 @@ Android 版本升级库。
             } 
 ```        
             
-####   创建`DownloadManager`
+####   3.创建`DownloadManager`
 
 ```java
         DownloadManager manager = DownloadManager.getInstance(this);
