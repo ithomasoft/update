@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 public class HttpDownloadManager extends BaseHttpDownloadManager {
 
-    private static final String TAG = Constant.TAG + "HttpDownloadManager";
+    private static String TAG = Constant.TAG + "HttpDownloadManager";
     private boolean shutdown = false;
     private String apkUrl, apkName, downloadPath;
     private OnDownloadListener listener;
@@ -49,6 +49,11 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
     @Override
     public void cancel() {
         shutdown = true;
+    }
+
+    @Override
+    public void release() {
+        listener = null;
     }
 
     private Runnable runnable = new Runnable() {

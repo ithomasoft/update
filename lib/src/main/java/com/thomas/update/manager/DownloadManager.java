@@ -14,13 +14,15 @@ import com.thomas.update.config.UpdateConfiguration;
 import com.thomas.update.dialog.UpdateDialog;
 import com.thomas.update.service.DownloadService;
 
+import java.lang.ref.SoftReference;
+
 public class DownloadManager {
     private static final String TAG = Constant.TAG + "DownloadManager";
 
     /**
      * 上下文
      */
-    private static Context context;
+    private static SoftReference<Context> context;
     /**
      * 要更新apk的下载地址
      */
@@ -86,7 +88,7 @@ public class DownloadManager {
      * @return {@link DownloadManager}
      */
     public static DownloadManager getInstance(Context context) {
-        DownloadManager.context = context;
+        DownloadManager.context = new SoftReference<>(context);
         if (manager == null) {
             synchronized (DownloadManager.class) {
                 if (manager == null) {
@@ -311,15 +313,15 @@ public class DownloadManager {
             return;
         }
         if (checkVersionCode()) {
-            context.startService(new Intent(context, DownloadService.class));
+            context.get().startService(new Intent(context.get(), DownloadService.class));
         } else {
             //对版本进行判断，是否显示升级对话框
-            if (apkVersionCode > getVersionCode(context)) {
-                dialog = new UpdateDialog(context);
+            if (apkVersionCode > getVersionCode(context.get())) {
+                dialog = new UpdateDialog(context.get());
                 dialog.show();
             } else {
                 if (showNewerToast) {
-                    Toast.makeText(context, R.string.latest_version, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context.get(), R.string.latest_version, Toast.LENGTH_SHORT).show();
                 }
                 Log.e(TAG, "当前已是最新版本");
             }
@@ -358,7 +360,7 @@ public class DownloadManager {
             Log.e(TAG, "apkName must endsWith .apk!");
             return false;
         }
-        downloadPath = context.getExternalCacheDir().getPath();
+        downloadPath = context.get().getExternalCacheDir().getPath();
         if (smallIcon == -1) {
             Log.e(TAG, "smallIcon can not be empty!");
             return false;
@@ -389,8 +391,12 @@ public class DownloadManager {
      * 释放资源
      */
     public void release() {
+        context.clear();
         context = null;
         manager = null;
+        if (configuration != null) {
+            configuration.getOnDownloadListener().clear();
+        }
     }
 
 
