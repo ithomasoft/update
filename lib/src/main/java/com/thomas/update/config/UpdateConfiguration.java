@@ -6,6 +6,7 @@ import androidx.annotation.ColorInt;
 
 import com.thomas.update.listener.OnButtonClickListener;
 import com.thomas.update.listener.OnDownloadListener;
+import com.thomas.update.listener.OnToastListener;
 import com.thomas.update.manager.BaseHttpDownloadManager;
 
 import java.util.ArrayList;
@@ -36,6 +37,10 @@ public class UpdateConfiguration {
      * 按钮点击事件回调
      */
     private OnButtonClickListener onButtonClickListener;
+    /**
+     * Toast提示回调
+     */
+    private OnToastListener onToastListener;
     /**
      * 下载完成是否自动弹出安装页面 (默认为true)
      */
@@ -108,6 +113,27 @@ public class UpdateConfiguration {
      */
     public List<OnDownloadListener> getOnDownloadListener() {
         return onDownloadListeners;
+    }
+
+
+    /**
+     * 获取toast监听
+     *
+     * @return
+     */
+    public OnToastListener getOnToastListener() {
+        return onToastListener;
+    }
+
+    /**
+     * 设置Toast监听
+     *
+     * @param onToastListener
+     * @return
+     */
+    public UpdateConfiguration setOnToastListener(OnToastListener onToastListener) {
+        this.onToastListener = onToastListener;
+        return this;
     }
 
     /**
@@ -259,4 +285,5 @@ public class UpdateConfiguration {
     public OnButtonClickListener getOnButtonClickListener() {
         return onButtonClickListener;
     }
+
 }

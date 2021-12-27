@@ -28,6 +28,7 @@ import com.thomas.update.R;
 import com.thomas.update.config.Constant;
 import com.thomas.update.config.UpdateConfiguration;
 import com.thomas.update.listener.OnDownloadListener;
+import com.thomas.update.listener.OnToastListener;
 import com.thomas.update.manager.BaseHttpDownloadManager;
 import com.thomas.update.manager.DownloadManager;
 import com.thomas.update.manager.HttpDownloadManager;
@@ -52,6 +53,7 @@ public final class DownloadService extends Service implements OnDownloadListener
     private int lastProgress;
     private DownloadManager downloadManager;
     private BaseHttpDownloadManager httpManager;
+    private OnToastListener onToastListener;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -78,6 +80,7 @@ public final class DownloadService extends Service implements OnDownloadListener
 
         UpdateConfiguration configuration = downloadManager.getConfiguration();
         listeners = configuration.getOnDownloadListener();
+        onToastListener = configuration.getOnToastListener();
         showNotification = configuration.isShowNotification();
         showBgdToast = configuration.isShowBgdToast();
         jumpInstallPage = configuration.isJumpInstallPage();
@@ -115,7 +118,7 @@ public final class DownloadService extends Service implements OnDownloadListener
             Log.e(TAG, "download: 当前正在下载，请务重复下载！");
             return;
         }
-       httpManager  = configuration.getHttpManager();
+        httpManager = configuration.getHttpManager();
         //使用自己的下载
         if (httpManager == null) {
             httpManager = new HttpDownloadManager(downloadPath);
@@ -150,7 +153,7 @@ public final class DownloadService extends Service implements OnDownloadListener
                 lastProgress = curr;
                 String downloading = getResources().getString(R.string.start_downloading);
                 String content = curr < 0 ? "" : curr + "%";
-               showProgressNotification(this, smallIcon, downloading,
+                showProgressNotification(this, smallIcon, downloading,
                         content, max == -1 ? -1 : 100, curr);
             }
         }
@@ -192,11 +195,6 @@ public final class DownloadService extends Service implements OnDownloadListener
             String msg = e.getMessage();
             String downloadError = getResources().getString(R.string.download_error);
             String conDownloading = getResources().getString(R.string.continue_downloading);
-            if (!TextUtils.isEmpty(msg) &&
-                    msg.contains("android.content.res.XmlResourceParser")) {
-                downloadError = getResources().getString(R.string.error_config);
-                conDownloading = getResources().getString(R.string.read_readme);
-            }
             showErrorNotification(this, smallIcon, downloadError, conDownloading);
         }
         handler.obtainMessage(5, e).sendToTarget();
@@ -208,7 +206,11 @@ public final class DownloadService extends Service implements OnDownloadListener
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case 0:
-                    Toast.makeText(DownloadService.this, R.string.background_downloading, Toast.LENGTH_SHORT).show();
+                    if (onToastListener != null) {
+                        onToastListener.showShort(R.string.background_downloading);
+                    }else {
+                        Toast.makeText(DownloadService.this, R.string.background_downloading, Toast.LENGTH_SHORT).show();
+                    }
                     break;
                 case 1:
                     for (OnDownloadListener listener : listeners) {
@@ -333,7 +335,6 @@ public final class DownloadService extends Service implements OnDownloadListener
     }
 
 
-
     /**
      * 构建一个消息
      *
@@ -385,7 +386,7 @@ public final class DownloadService extends Service implements OnDownloadListener
      * @param content 内容
      */
     private static void showProgressNotification(Context context, int icon, String title, String content,
-                                                int max, int progress) {
+                                                 int max, int progress) {
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationCompat.Builder builder = builderNotification(context, icon, title, content)
                 //indeterminate:true表示不确定进度，false表示确定进度
@@ -397,11 +398,11 @@ public final class DownloadService extends Service implements OnDownloadListener
     /**
      * 显示下载完成的通知,点击进行安装
      *
-     * @param context     上下文
-     * @param icon        图标
-     * @param title       标题
-     * @param content     内容
-     * @param apk         安装包
+     * @param context 上下文
+     * @param icon    图标
+     * @param title   标题
+     * @param content 内容
+     * @param apk     安装包
      */
     private static void showDoneNotification(Context context, int icon, String title, String content, File apk) {
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -419,7 +420,7 @@ public final class DownloadService extends Service implements OnDownloadListener
             uri = Uri.fromFile(apk);
         }
         intent.setDataAndType(uri, "application/vnd.android.package-archive");
-        PendingIntent pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = builderNotification(context, icon, title, content)
                 .setContentIntent(pi);
         Notification notification = builder.build();
@@ -441,7 +442,7 @@ public final class DownloadService extends Service implements OnDownloadListener
             afterO(manager);
         }
         Intent intent = new Intent(context, DownloadService.class);
-        PendingIntent pi = PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pi = PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = builderNotification(context, icon, title, content)
                 .setAutoCancel(true)
                 .setOngoing(false)

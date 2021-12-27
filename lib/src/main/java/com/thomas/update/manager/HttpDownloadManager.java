@@ -20,10 +20,21 @@ import java.util.concurrent.TimeUnit;
 
 public class HttpDownloadManager extends BaseHttpDownloadManager {
 
-    private static String TAG = Constant.TAG + "HttpDownloadManager";
+    private static final String TAG = "HttpDownloadManager";
+    private String apkUrl;
+    private String apkName;
     private boolean shutdown = false;
-    private String apkUrl, apkName, downloadPath;
+    private final String downloadPath;
     private OnDownloadListener listener;
+    private final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1,
+            0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
+        @Override
+        public Thread newThread(@NonNull Runnable r) {
+            Thread thread = new Thread(r);
+            thread.setName(Constant.THREAD_NAME);
+            return thread;
+        }
+    });
 
     public HttpDownloadManager(String downloadPath) {
         this.downloadPath = downloadPath;
@@ -34,15 +45,6 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
         this.apkUrl = apkUrl;
         this.apkName = apkName;
         this.listener = listener;
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
-            @Override
-            public Thread newThread(@NonNull Runnable r) {
-                Thread thread = new Thread(r);
-                thread.setName(Constant.THREAD_NAME);
-                return thread;
-            }
-        });
         executor.execute(runnable);
     }
 
@@ -54,6 +56,7 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
     @Override
     public void release() {
         listener = null;
+        executor.shutdown();
     }
 
     private Runnable runnable = new Runnable() {
@@ -71,7 +74,9 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
      * 全部下载
      */
     private void fullDownload() {
-        listener.start();
+        if (listener != null) {
+            listener.start();
+        }
         try {
             URL url = new URL(apkUrl);
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
@@ -86,13 +91,15 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
                 //当前已下载完成的进度
                 int progress = 0;
                 byte[] buffer = new byte[1024 * 2];
-                File file = new File(downloadPath, apkName);
+                File file = createFile(downloadPath, apkName);
                 FileOutputStream stream = new FileOutputStream(file);
                 while ((len = is.read(buffer)) != -1 && !shutdown) {
                     //将获取到的流写入文件中
                     stream.write(buffer, 0, len);
                     progress += len;
-                    listener.downloading(length, progress);
+                    if (listener != null) {
+                        listener.downloading(length, progress);
+                    }
                 }
                 if (shutdown) {
                     //取消了下载 同时再恢复状态
@@ -100,7 +107,9 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
                     Log.d(TAG, "fullDownload: 取消了下载");
                     listener.cancel();
                 } else {
-                    listener.done(file);
+                    if (listener != null) {
+                        listener.done(file);
+                    }
                 }
                 //完成io操作,释放资源
                 stream.flush();
@@ -114,11 +123,16 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
                 Log.d(TAG, "fullDownload: 当前地址是重定向Url，定向后的地址：" + apkUrl);
                 fullDownload();
             } else {
-                listener.error(new SocketTimeoutException("下载失败：Http ResponseCode = " + con.getResponseCode()));
+                if (listener != null) {
+
+                    listener.error(new SocketTimeoutException("下载失败：Http ResponseCode = " + con.getResponseCode()));
+                }
             }
             con.disconnect();
         } catch (Exception e) {
-            listener.error(e);
+            if (listener != null) {
+                listener.error(e);
+            }
             e.printStackTrace();
         }
     }
@@ -145,4 +159,16 @@ public class HttpDownloadManager extends BaseHttpDownloadManager {
     private static boolean delete(String downloadPath, String fileName) {
         return new File(downloadPath, fileName).delete();
     }
+
+    /**
+     * 创建一个文件
+     *
+     * @param downloadPath 路径
+     * @param fileName     名字
+     * @return 文件
+     */
+    private static File createFile(String downloadPath, String fileName) {
+        return new File(downloadPath, fileName);
+    }
+
 }

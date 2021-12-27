@@ -321,7 +321,11 @@ public class DownloadManager {
                 dialog.show();
             } else {
                 if (showNewerToast) {
-                    Toast.makeText(context.get(), R.string.latest_version, Toast.LENGTH_SHORT).show();
+                    if (configuration.getOnToastListener() != null) {
+                        configuration.getOnToastListener().showShort(R.string.latest_version);
+                    }else {
+                        Toast.makeText(context.get(), R.string.latest_version, Toast.LENGTH_SHORT).show();
+                    }
                 }
                 Log.e(TAG, "当前已是最新版本");
             }
