@@ -39,9 +39,9 @@ import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.util.List;
 
-public final class DownloadService extends Service implements OnDownloadListener {
+public class DownloadService extends Service implements OnDownloadListener {
 
-    private static final String TAG = Constant.TAG + "DownloadService";
+    private final static String TAG = Constant.TAG + "DownloadService";
     private int smallIcon;
     private String apkUrl;
     private String apkName;
@@ -80,7 +80,6 @@ public final class DownloadService extends Service implements OnDownloadListener
 
         UpdateConfiguration configuration = downloadManager.getConfiguration();
         listeners = configuration.getOnDownloadListener();
-        onToastListener = configuration.getOnToastListener();
         showNotification = configuration.isShowNotification();
         showBgdToast = configuration.isShowBgdToast();
         jumpInstallPage = configuration.isJumpInstallPage();
@@ -90,7 +89,7 @@ public final class DownloadService extends Service implements OnDownloadListener
         if (checkApkMD5()) {
             Log.d(TAG, "文件已经存在直接进行安装");
             //直接调用完成监听即可
-            done(new File(downloadPath, apkName));
+            done(createFile(downloadPath, apkName));
         } else {
             Log.d(TAG, "文件不存在开始下载");
             download(configuration);
@@ -104,7 +103,7 @@ public final class DownloadService extends Service implements OnDownloadListener
      */
     private boolean checkApkMD5() {
         if (fileExists(downloadPath, apkName)) {
-            String fileMD5 = getFileMD5(new File(downloadPath, apkName));
+            String fileMD5 = getFileMD5(createFile(downloadPath, apkName));
             return fileMD5.equalsIgnoreCase(downloadManager.getApkMD5());
         }
         return false;
@@ -169,7 +168,7 @@ public final class DownloadService extends Service implements OnDownloadListener
             String downloadCompleted = getResources().getString(R.string.download_completed);
             String clickHint = getResources().getString(R.string.click_hint);
             showDoneNotification(this, smallIcon, downloadCompleted,
-                    clickHint, apk);
+                    clickHint,  apk);
         }
         if (jumpInstallPage) {
             installApk(this, apk);
@@ -192,7 +191,6 @@ public final class DownloadService extends Service implements OnDownloadListener
         Log.e(TAG, "error: " + e);
         downloadManager.setState(false);
         if (showNotification) {
-            String msg = e.getMessage();
             String downloadError = getResources().getString(R.string.download_error);
             String conDownloading = getResources().getString(R.string.continue_downloading);
             showErrorNotification(this, smallIcon, downloadError, conDownloading);
@@ -206,7 +204,7 @@ public final class DownloadService extends Service implements OnDownloadListener
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case 0:
-                    if (onToastListener != null) {
+                    if (onToastListener!=null){
                         onToastListener.showShort(R.string.background_downloading);
                     }else {
                         Toast.makeText(DownloadService.this, R.string.background_downloading, Toast.LENGTH_SHORT).show();
@@ -266,7 +264,6 @@ public final class DownloadService extends Service implements OnDownloadListener
         return null;
     }
 
-
     /**
      * 安装一个apk
      *
@@ -297,6 +294,10 @@ public final class DownloadService extends Service implements OnDownloadListener
         if (!dirDirectory.exists()) {
             dirDirectory.mkdirs();
         }
+    }
+
+    private static File createFile(String downloadPath, String fileName) {
+        return new File(downloadPath, fileName);
     }
 
     /**
