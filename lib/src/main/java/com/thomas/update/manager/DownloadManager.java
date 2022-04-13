@@ -1,5 +1,6 @@
 package com.thomas.update.manager;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -8,13 +9,14 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+
 import com.thomas.update.R;
 import com.thomas.update.config.Constant;
 import com.thomas.update.config.UpdateConfiguration;
-import com.thomas.update.dialog.UpdateDialog;
+import com.thomas.update.dialog.UpdateDialogActivity;
+import com.thomas.update.listener.LifecycleCallbacksAdapter;
 import com.thomas.update.service.DownloadService;
-
-import java.lang.ref.SoftReference;
 
 public class DownloadManager {
     private static final String TAG = Constant.TAG + "DownloadManager";
@@ -22,7 +24,7 @@ public class DownloadManager {
     /**
      * 上下文
      */
-    private static SoftReference<Context> context;
+    private Context context;
     /**
      * 要更新apk的下载地址
      */
@@ -74,29 +76,37 @@ public class DownloadManager {
      */
     private boolean state = false;
 
-    /**
-     * 内置对话框
-     */
-    private UpdateDialog dialog;
-
     private static DownloadManager manager;
 
     /**
      * 框架初始化
      *
-     * @param context 上下文
+     * @param activity 上下文
      * @return {@link DownloadManager}
      */
-    public static DownloadManager getInstance(Context context) {
-        DownloadManager.context = new SoftReference<>(context);
+    public static DownloadManager getInstance(Activity activity) {
         if (manager == null) {
             synchronized (DownloadManager.class) {
                 if (manager == null) {
-                    manager = new DownloadManager();
+                    manager = new DownloadManager(activity);
                 }
             }
         }
         return manager;
+    }
+
+    private DownloadManager(Activity activity) {
+        this.context = activity.getApplicationContext();
+        final String className = activity.getClass().getName();
+        activity.getApplication().registerActivityLifecycleCallbacks(new LifecycleCallbacksAdapter() {
+            @Override
+            public void onActivityDestroyed(@NonNull Activity activity) {
+                super.onActivityDestroyed(activity);
+                if (className.equals(activity.getClass().getName())) {
+                    onDestroy();
+                }
+            }
+        });
     }
 
     /**
@@ -298,13 +308,6 @@ public class DownloadManager {
     }
 
     /**
-     * 获取内置对话框
-     */
-    public UpdateDialog getDefaultDialog() {
-        return dialog;
-    }
-
-    /**
      * 开始下载
      */
     public void download() {
@@ -313,18 +316,18 @@ public class DownloadManager {
             return;
         }
         if (checkVersionCode()) {
-            context.get().startService(new Intent(context.get(), DownloadService.class));
+            context.startService(new Intent(context, DownloadService.class));
         } else {
             //对版本进行判断，是否显示升级对话框
-            if (apkVersionCode > getVersionCode(context.get())) {
-                dialog = new UpdateDialog(context.get());
-                dialog.show();
+            if (apkVersionCode > getVersionCode(context)) {
+                context.startActivity(new Intent(context, UpdateDialogActivity.class)
+                        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else {
                 if (showNewerToast) {
                     if (configuration.getOnToastListener() != null) {
                         configuration.getOnToastListener().showShort(R.string.latest_version);
-                    }else {
-                        Toast.makeText(context.get(), R.string.latest_version, Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(context, R.string.latest_version, Toast.LENGTH_SHORT).show();
                     }
                 }
                 Log.e(TAG, "当前已是最新版本");
@@ -364,7 +367,7 @@ public class DownloadManager {
             Log.e(TAG, "apkName must endsWith .apk!");
             return false;
         }
-        downloadPath = context.get().getExternalCacheDir().getPath();
+        downloadPath = context.getExternalCacheDir().getPath();
         if (smallIcon == -1) {
             Log.e(TAG, "smallIcon can not be empty!");
             return false;
@@ -392,17 +395,25 @@ public class DownloadManager {
     }
 
     /**
-     * 释放资源
+     * 宿主Activity被销毁，需要移除
+     */
+    private void onDestroy() {
+        if (configuration != null) {
+            configuration.setButtonClickListener(null);
+            configuration.getOnDownloadListener().clear();
+        }
+    }
+
+    /**
+     * 释放资源，框架内部使用
      */
     public void release() {
-        context.clear();
         context = null;
         manager = null;
         if (configuration != null) {
             configuration.getOnDownloadListener().clear();
         }
     }
-
 
     /**
      * 获取当前app的升级版本号
