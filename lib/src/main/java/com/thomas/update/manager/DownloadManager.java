@@ -1,164 +1,425 @@
 package com.thomas.update.manager;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.text.TextUtils;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import com.thomas.update.R;
 import com.thomas.update.config.Constant;
-import com.thomas.update.listener.OnDownloadListener;
+import com.thomas.update.config.UpdateConfiguration;
+import com.thomas.update.dialog.UpdateDialogActivity;
+import com.thomas.update.listener.LifecycleCallbacksAdapter;
+import com.thomas.update.service.DownloadService;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.SocketTimeoutException;
-import java.net.URL;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+public class DownloadManager {
 
-public class HttpDownloadManager extends BaseHttpDownloadManager {
+    private static final String TAG = Constant.TAG + "DownloadManager";
 
-    private static String TAG = Constant.TAG + "HttpDownloadManager";
-    private String apkUrl;
-    private String apkName;
-    private boolean shutdown = false;
-    private final String downloadPath;
-    private OnDownloadListener listener;
-    private final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1,
-            0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
-        @Override
-        public Thread newThread(@NonNull Runnable r) {
-            Thread thread = new Thread(r);
-            thread.setName(Constant.THREAD_NAME);
-            return thread;
+    /**
+     * 上下文
+     */
+    private Context context;
+    /**
+     * 要更新apk的下载地址
+     */
+    private String apkUrl = "";
+    /**
+     * apk下载好的名字 .apk 结尾
+     */
+    private String apkName = "";
+    /**
+     * apk 下载存放的位置
+     */
+    private String downloadPath;
+    /**
+     * 是否提示用户 "当前已是最新版本"
+     * <p>
+     * {@link #download()}
+     */
+    private boolean showNewerToast = false;
+    /**
+     * 通知栏的图标 资源路径
+     */
+    private int smallIcon = -1;
+    /**
+     * 整个库的一些配置属性，可以从这里配置
+     */
+    private UpdateConfiguration configuration;
+    /**
+     * 要更新apk的versionCode
+     */
+    private int apkVersionCode = Integer.MIN_VALUE;
+    /**
+     * 显示给用户的版本号
+     */
+    private String apkVersionName = "";
+    /**
+     * 更新描述
+     */
+    private String apkDescription = "";
+    /**
+     * 安装包大小 单位 M
+     */
+    private String apkSize = "";
+    /**
+     * 新安装包md5文件校验（32位)，校验重复下载
+     */
+    private String apkMD5 = "";
+    /**
+     * 当前下载状态
+     */
+    private boolean state = false;
+
+    private static DownloadManager manager;
+
+    /**
+     * 框架初始化
+     *
+     * @param activity 上下文
+     * @return {@link DownloadManager}
+     */
+    public static DownloadManager getInstance(Activity activity) {
+        if (manager == null) {
+            synchronized (DownloadManager.class) {
+                if (manager == null) {
+                    manager = new DownloadManager(activity);
+                }
+            }
         }
-    });
-
-    public HttpDownloadManager(String downloadPath) {
-        this.downloadPath = downloadPath;
+        return manager;
     }
 
-    @Override
-    public void download(String apkUrl, String apkName, OnDownloadListener listener) {
+    private DownloadManager(Activity activity) {
+        this.context = activity.getApplicationContext();
+        final String className = activity.getClass().getName();
+        activity.getApplication().registerActivityLifecycleCallbacks(new LifecycleCallbacksAdapter() {
+            @Override
+            public void onActivityDestroyed(@NonNull Activity activity) {
+                super.onActivityDestroyed(activity);
+                if (className.equals(activity.getClass().getName())) {
+                    onDestroy();
+                }
+            }
+        });
+    }
+
+    /**
+     * 供此依赖库自己使用.
+     *
+     * @return {@link DownloadManager}
+     * @hide
+     */
+    public static DownloadManager getInstance() {
+        return manager;
+    }
+
+    /**
+     * 获取apk下载地址
+     */
+    public String getApkUrl() {
+        return apkUrl;
+    }
+
+    /**
+     * 设置apk下载地址
+     */
+    public DownloadManager setApkUrl(String apkUrl) {
         this.apkUrl = apkUrl;
+        return this;
+    }
+
+    /**
+     * 获取apk的VersionCode
+     */
+    public int getApkVersionCode() {
+        return apkVersionCode;
+    }
+
+    /**
+     * 设置apk的VersionCode
+     */
+    public DownloadManager setApkVersionCode(int apkVersionCode) {
+        this.apkVersionCode = apkVersionCode;
+        return this;
+    }
+
+    /**
+     * 获取apk的名称
+     */
+    public String getApkName() {
+        return apkName;
+    }
+
+    /**
+     * 设置apk的名称
+     */
+    public DownloadManager setApkName(String apkName) {
         this.apkName = apkName;
-        this.listener = listener;
-        executor.execute(runnable);
+        return this;
     }
-
-    @Override
-    public void cancel() {
-        shutdown = true;
-    }
-
-    @Override
-    public void release() {
-        listener = null;
-        executor.shutdown();
-    }
-
-    private Runnable runnable = new Runnable() {
-        @Override
-        public void run() {
-            //删除之前的安装包
-            if (fileExists(downloadPath, apkName)) {
-                delete(downloadPath, apkName);
-            }
-            fullDownload();
-        }
-    };
 
     /**
-     * 全部下载
+     * 获取apk的保存路径
      */
-    private void fullDownload() {
-        if (listener != null) listener.start();
-        try {
-            URL url = new URL(apkUrl);
-            HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setRequestMethod("GET");
-            con.setReadTimeout(Constant.HTTP_TIME_OUT);
-            con.setConnectTimeout(Constant.HTTP_TIME_OUT);
-            con.setRequestProperty("Accept-Encoding", "identity");
-            if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                InputStream is = con.getInputStream();
-                int length = con.getContentLength();
-                int len;
-                //当前已下载完成的进度
-                int progress = 0;
-                byte[] buffer = new byte[1024 * 2];
-                File file = createFile(downloadPath, apkName);
-                FileOutputStream stream = new FileOutputStream(file);
-                while ((len = is.read(buffer)) != -1 && !shutdown) {
-                    //将获取到的流写入文件中
-                    stream.write(buffer, 0, len);
-                    progress += len;
-                    if (listener != null) listener.downloading(length, progress);
-                }
-                if (shutdown) {
-                    //取消了下载 同时再恢复状态
-                    shutdown = false;
-                    Log.d(TAG, "fullDownload: 取消了下载");
-                    if (listener != null) listener.cancel();
-                } else {
-                    if (listener != null) listener.done(file);
-                }
-                //完成io操作,释放资源
-                stream.flush();
-                stream.close();
-                is.close();
-                //重定向
-            } else if (con.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM ||
-                    con.getResponseCode() == HttpURLConnection.HTTP_MOVED_TEMP) {
-                apkUrl = con.getHeaderField("Location");
-                con.disconnect();
-                Log.d(TAG, "fullDownload: 当前地址是重定向Url，定向后的地址：" + apkUrl);
-                fullDownload();
+    public String getDownloadPath() {
+        return downloadPath;
+    }
+
+    /**
+     * 设置apk的保存路径
+     * 由于Android Q版本限制应用访问外部存储目录，所以不再支持设置存储目录
+     * 使用的路径为:/storage/emulated/0/Android/data/ your packageName /cache
+     */
+    @Deprecated
+    public DownloadManager setDownloadPath(String downloadPath) {
+        return this;
+    }
+
+    /**
+     * 设置是否提示用户"当前已是最新版本"
+     */
+    public DownloadManager setShowNewerToast(boolean showNewerToast) {
+        this.showNewerToast = showNewerToast;
+        return this;
+    }
+
+    /**
+     * 获取是否提示用户"当前已是最新版本"
+     */
+    public boolean isShowNewerToast() {
+        return showNewerToast;
+    }
+
+    /**
+     * 获取通知栏图片资源id
+     */
+    public int getSmallIcon() {
+        return smallIcon;
+    }
+
+    /**
+     * 设置通知栏图片资源id
+     */
+    public DownloadManager setSmallIcon(int smallIcon) {
+        this.smallIcon = smallIcon;
+        return this;
+    }
+
+    /**
+     * 设置这个库的额外配置信息
+     *
+     * @see UpdateConfiguration
+     */
+    public DownloadManager setConfiguration(UpdateConfiguration configuration) {
+        this.configuration = configuration;
+        return this;
+    }
+
+    /**
+     * 获取这个库的额外配置信息
+     *
+     * @see UpdateConfiguration
+     */
+    public UpdateConfiguration getConfiguration() {
+        return configuration;
+    }
+
+    /**
+     * 获取apk的versionName
+     */
+    public String getApkVersionName() {
+        return apkVersionName;
+    }
+
+    /**
+     * 设置apk的versionName
+     */
+    public DownloadManager setApkVersionName(String apkVersionName) {
+        this.apkVersionName = apkVersionName;
+        return this;
+    }
+
+    /**
+     * 获取新版本描述信息
+     */
+    public String getApkDescription() {
+        return apkDescription;
+    }
+
+    /**
+     * 设置新版本描述信息
+     */
+    public DownloadManager setApkDescription(String apkDescription) {
+        this.apkDescription = apkDescription;
+        return this;
+    }
+
+    /**
+     * 获取新版本文件大小
+     */
+    public String getApkSize() {
+        return apkSize;
+    }
+
+    /**
+     * 设置新版本文件大小
+     */
+    public DownloadManager setApkSize(String apkSize) {
+        this.apkSize = apkSize;
+        return this;
+    }
+
+    /**
+     * 新安装包md5文件校验
+     */
+    public DownloadManager setApkMD5(String apkMD5) {
+        this.apkMD5 = apkMD5;
+        return this;
+    }
+
+    /**
+     * 新安装包md5文件校验
+     */
+    public String getApkMD5() {
+        return apkMD5;
+    }
+
+
+    /**
+     * 设置当前状态
+     *
+     * @hide
+     */
+    public void setState(boolean state) {
+        this.state = state;
+    }
+
+    /**
+     * 当前是否正在下载
+     */
+    public boolean isDownloading() {
+        return state;
+    }
+
+    /**
+     * 开始下载
+     */
+    public void download() {
+        if (!checkParams()) {
+            //参数设置出错....
+            return;
+        }
+        if (checkVersionCode()) {
+            context.startService(new Intent(context, DownloadService.class));
+        } else {
+            //对版本进行判断，是否显示升级对话框
+            if (apkVersionCode > getVersionCode(context)) {
+                context.startActivity(new Intent(context, UpdateDialogActivity.class)
+                        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else {
-                if (listener != null)
-                    listener.error(new SocketTimeoutException("下载失败：Http ResponseCode = " + con.getResponseCode()));
+                if (showNewerToast) {
+                    Toast.makeText(context, R.string.latest_version, Toast.LENGTH_SHORT).show();
+                }
+                Log.e(TAG, "当前已是最新版本");
             }
-            con.disconnect();
-        } catch (Exception e) {
-            if (listener != null) listener.error(e);
-            e.printStackTrace();
         }
     }
 
-
     /**
-     * 查看一个文件是否存在
-     *
-     * @param downloadPath 路径
-     * @param fileName     名字
-     * @return true | false
+     * 取消下载
      */
-    private static boolean fileExists(String downloadPath, String fileName) {
-        return new File(downloadPath, fileName).exists();
+    public void cancel() {
+        if (configuration == null) {
+            Log.e(TAG, "还未开始下载");
+            return;
+        }
+        BaseHttpDownloadManager httpManager = configuration.getHttpManager();
+        if (httpManager == null) {
+            Log.e(TAG, "还未开始下载");
+            return;
+        }
+        httpManager.cancel();
     }
 
     /**
-     * 删除一个文件
-     *
-     * @param downloadPath 路径
-     * @param fileName     名字
-     * @return true | false
+     * 检查参数
      */
-    private static boolean delete(String downloadPath, String fileName) {
-        return new File(downloadPath, fileName).delete();
+    private boolean checkParams() {
+        if (TextUtils.isEmpty(apkUrl)) {
+            Log.e(TAG, "apkUrl can not be empty!");
+            return false;
+        }
+        if (TextUtils.isEmpty(apkName)) {
+            Log.e(TAG, "apkName can not be empty!");
+            return false;
+        }
+        if (!apkName.endsWith(Constant.APK_SUFFIX)) {
+            Log.e(TAG, "apkName must endsWith .apk!");
+            return false;
+        }
+        downloadPath = context.getExternalCacheDir().getPath();
+        if (smallIcon == -1) {
+            Log.e(TAG, "smallIcon can not be empty!");
+            return false;
+        }
+        //如果用户没有进行配置，则使用默认的配置
+        if (configuration == null) {
+            configuration = new UpdateConfiguration();
+        }
+        return true;
     }
 
     /**
-     * 创建一个文件
-     *
-     * @param downloadPath 路径
-     * @param fileName     名字
-     * @return 文件
+     * 检查设置的{@link this#apkVersionCode} 如果不是默认值则使用内置的对话框
+     * 如果是默认值{@link Integer#MIN_VALUE}直接启动服务下载
      */
-    private static File createFile(String downloadPath, String fileName) {
-        return new File(downloadPath, fileName);
+    private boolean checkVersionCode() {
+        if (apkVersionCode == Integer.MIN_VALUE) {
+            return true;
+        }
+        //设置了 VersionCode 则库中进行对话框逻辑处理
+        if (TextUtils.isEmpty(apkDescription)) {
+            Log.e(TAG, "apkDescription can not be empty!");
+        }
+        return false;
     }
 
+    /**
+     * 宿主Activity被销毁，需要移除
+     */
+    private void onDestroy() {
+        if (configuration != null) {
+            configuration.setButtonClickListener(null);
+            configuration.getOnDownloadListener().clear();
+        }
+    }
+
+    /**
+     * 释放资源，框架内部使用
+     */
+    public void release() {
+        context = null;
+        manager = null;
+        if (configuration != null) {
+            configuration.getOnDownloadListener().clear();
+        }
+    }
+
+    private static int getVersionCode(Context context) {
+        try {
+            PackageManager packageManager = context.getPackageManager();
+            PackageInfo packageInfo = packageManager.getPackageInfo(context.getPackageName(), 0);
+            return packageInfo.versionCode;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 1;
+        }
+    }
 }
