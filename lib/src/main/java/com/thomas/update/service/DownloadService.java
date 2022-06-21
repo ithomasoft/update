@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
@@ -58,7 +59,7 @@ public class DownloadService extends Service implements OnDownloadListener {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (null == intent) {
-            return START_STICKY;
+            return START_NOT_STICKY;
         }
         init();
         return super.onStartCommand(intent, flags, startId);
@@ -199,7 +200,7 @@ public class DownloadService extends Service implements OnDownloadListener {
     }
 
     @SuppressLint("HandlerLeak")
-    private Handler handler = new Handler() {
+    private Handler handler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {

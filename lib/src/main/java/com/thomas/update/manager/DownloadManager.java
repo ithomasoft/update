@@ -77,7 +77,7 @@ public class DownloadManager {
      */
     private boolean state = false;
 
-    private static DownloadManager manager;
+    private static volatile DownloadManager manager;
 
     /**
      * 框架初始化
@@ -114,7 +114,6 @@ public class DownloadManager {
      * 供此依赖库自己使用.
      *
      * @return {@link DownloadManager}
-     * @hide
      */
     public static DownloadManager getInstance() {
         return manager;
@@ -295,7 +294,6 @@ public class DownloadManager {
     /**
      * 设置当前状态
      *
-     * @hide
      */
     public void setState(boolean state) {
         this.state = state;
@@ -325,7 +323,11 @@ public class DownloadManager {
                         .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else {
                 if (showNewerToast) {
-                    Toast.makeText(context, R.string.latest_version, Toast.LENGTH_SHORT).show();
+                    if (configuration != null && configuration.getOnToastListener() != null) {
+                        getConfiguration().getOnToastListener().showShort(R.string.latest_version);
+                    } else {
+                        Toast.makeText(context, R.string.latest_version, Toast.LENGTH_SHORT).show();
+                    }
                 }
                 Log.e(TAG, "当前已是最新版本");
             }
