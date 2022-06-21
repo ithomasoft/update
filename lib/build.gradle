@@ -3,6 +3,14 @@ apply plugin: 'maven-publish'
 group = 'com.github.ithomasoft'
 
 android {
+
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
+
     compileSdkVersion 32
 
     defaultConfig {
@@ -31,10 +39,13 @@ dependencies {
 }
 afterEvaluate {
     publishing {
+
+
+
         publications {
             // Creates a Maven publication called "release".
             release(MavenPublication) {
-                from components.release
+                from components.getByName('release')
                 groupId = 'com.github.ithomasoft'
                 artifactId = 'update'
                 version = '1.6.1'
