@@ -29,7 +29,6 @@ import com.thomas.update.R;
 import com.thomas.update.config.Constant;
 import com.thomas.update.config.UpdateConfiguration;
 import com.thomas.update.listener.OnDownloadListener;
-import com.thomas.update.listener.OnToastListener;
 import com.thomas.update.manager.BaseHttpDownloadManager;
 import com.thomas.update.manager.DownloadManager;
 import com.thomas.update.manager.HttpDownloadManager;
@@ -54,7 +53,6 @@ public class DownloadService extends Service implements OnDownloadListener {
     private int lastProgress;
     private DownloadManager downloadManager;
     private BaseHttpDownloadManager httpManager;
-    private OnToastListener onToastListener;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -169,7 +167,7 @@ public class DownloadService extends Service implements OnDownloadListener {
             String downloadCompleted = getResources().getString(R.string.download_completed);
             String clickHint = getResources().getString(R.string.click_hint);
             showDoneNotification(this, smallIcon, downloadCompleted,
-                    clickHint,  apk);
+                    clickHint, apk);
         }
         if (jumpInstallPage) {
             installApk(this, apk);
@@ -205,9 +203,9 @@ public class DownloadService extends Service implements OnDownloadListener {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case 0:
-                    if (onToastListener!=null){
-                        onToastListener.showShort(R.string.background_downloading);
-                    }else {
+                    if (downloadManager.getConfiguration().getOnToastListener() != null) {
+                        downloadManager.getConfiguration().getOnToastListener().showShort(R.string.background_downloading);
+                    } else {
                         Toast.makeText(DownloadService.this, R.string.background_downloading, Toast.LENGTH_SHORT).show();
                     }
                     break;
