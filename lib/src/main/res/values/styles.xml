@@ -2,7 +2,7 @@
 <resources>
 
     <!--对话框的样式-->
-    <style name="DialogActivity" >
+    <style name="DialogActivity" parent="Theme.AppCompat.DayNight">
         <!--对话框背景 -->
         <item name="android:windowBackground">@android:color/transparent</item>
         <!--边框 -->
